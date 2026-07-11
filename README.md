@@ -410,8 +410,8 @@ git subtree push --prefix frontend/dist origin gh-pages
 
 Despues de 1-3 minutos, revisa tu URL de Pages:
 
-- Sitio usuario/organizacion: `https://TU_USUARIO.github.io/`
-- Sitio de proyecto: `https://TU_USUARIO.github.io/paginaliliysusazoncompleta/`
+- Sitio usuario/organizacion: `https://liliysusazoncompleta.github.io/`
+- Sitio de proyecto: `https://liliysusazoncompleta.github.io/paginaliliysusazoncompleta/`
 
 Si usas sitio de proyecto y ves rutas/estilos rotos, configura la base en `frontend/vite.config.ts`:
 
