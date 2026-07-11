@@ -1,0 +1,15 @@
+{
+  "name": "paginaliliysusazoncompleta",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @lili/backend dev\" \"pnpm --filter @lili/frontend dev\"",
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @lili/backend start",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
