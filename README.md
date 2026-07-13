@@ -345,11 +345,13 @@ funciona igual que en produccion.
 - Construir con `pnpm --filter @lili/frontend build`.
 - Servir `frontend/dist` en CDN/hosting estatico (Vercel, Netlify, Nginx).
 - Configurar el hosting para servir `index.html` en cualquier ruta (SPA fallback), ya que el sitio usa rutas de React Router (`/catalogo`, `/contacto`, `/pedido`).
+- En este proyecto ya esta configurada la base para GitHub Pages de tipo proyecto en `frontend/vite.config.ts` (`base: '/paginaliliysusazoncompleta/'`) y el router usa `basename` en `frontend/src/main.tsx`.
 
 2. Backend
 - Construir con `pnpm --filter @lili/backend build`.
-- Ejecutar con `pnpm --filter @lili/backend start` en servidor/contendor.
+- Ejecutar con `pnpm --filter @lili/backend start` en servidor/contenedor.
 - Configurar variables de entorno seguras (`DATABASE_URL`, `OPENAI_API_KEY`, `SMTP_*`).
+- **Importante:** GitHub Pages solo publica frontend estatico. El backend (API, IA, PDF, correo, base de datos) debe quedar desplegado aparte (por ejemplo en Render/Railway/VPS) y el frontend debe apuntar a esa API con `VITE_API_URL`.
 
 3. Base de datos
 - Ejecutar migracion de `db/migrations` antes del primer despliegue.
@@ -363,7 +365,7 @@ funciona igual que en produccion.
 
 ## Actualizar repositorio y pagina en GitHub Pages (github.io)
 
-Si quieres subir cambios al repo y reflejarlos en tu pagina de GitHub Pages, sigue este flujo:
+Si quieres subir cambios al repo y reflejarlos en tu pagina de GitHub Pages, sigue este flujo actualizado:
 
 ### 1) Traer lo ultimo del repositorio
 
@@ -382,6 +384,12 @@ pnpm dev
 pnpm build
 ```
 
+Si vas a publicar en Pages, valida tambien el build del frontend por separado:
+
+```bash
+pnpm --filter @lili/frontend build
+```
+
 ### 3) Subir cambios al repositorio
 
 ```bash
@@ -390,7 +398,17 @@ git commit -m "Actualiza contenido y ajustes del sitio"
 git push origin main
 ```
 
-### 4) Publicar/actualizar el frontend en GitHub Pages
+### 4) Configurar GitHub Pages correctamente (una sola vez)
+
+En GitHub: **Settings > Pages**
+
+- Source: **Deploy from a branch**
+- Branch: **gh-pages**
+- Folder: **/(root)**
+
+> Si dejas `main` + `/(root)`, GitHub Pages mostrara el `README.md` del repositorio en vez del frontend compilado.
+
+### 5) Publicar/actualizar el frontend en GitHub Pages
 
 Compila solo el frontend:
 
@@ -406,24 +424,18 @@ git subtree push --prefix frontend/dist origin gh-pages
 
 > Si `gh-pages` no existe, GitHub la crea al primer push. Luego, en **Settings > Pages** del repositorio, selecciona **Deploy from a branch** y la rama **gh-pages** (root).
 
-### 5) Esperar despliegue y validar
+### 6) Esperar despliegue y validar
 
 Despues de 1-3 minutos, revisa tu URL de Pages:
 
 - Sitio usuario/organizacion: `https://liliysusazoncompleta.github.io/`
 - Sitio de proyecto: `https://liliysusazoncompleta.github.io/paginaliliysusazoncompleta/`
 
-Si usas sitio de proyecto y ves rutas/estilos rotos, configura la base en `frontend/vite.config.ts`:
+Si no carga cambios de inmediato, fuerza recarga del navegador (Ctrl+F5) y confirma en la pestaña **Actions** que el despliegue de Pages termino en estado exitoso.
 
-```ts
-export default defineConfig({
-   base: '/paginaliliysusazoncompleta/',
-   plugins: [react()],
-   // ...
-});
-```
+### 7) (Opcional) Publicar cambios del backend en produccion
 
-Luego repite build y push a `gh-pages`.
+Si tus cambios afectan API, chatbot IA, envio de correo o generacion de PDF, recuerda desplegar tambien el backend y actualizar en frontend la variable `VITE_API_URL` al dominio real del backend (por ejemplo `https://api.tu-dominio.com/api`).
 
 ## Roadmap sugerido
 
