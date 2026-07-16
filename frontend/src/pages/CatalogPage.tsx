@@ -14,6 +14,7 @@ export function CatalogPage() {
     search,
     setSearch,
     loading,
+    error,
     addToCart,
     downloadCatalog,
   } = useCart();
@@ -85,8 +86,12 @@ export function CatalogPage() {
 
         <div className="catalog-main">
           {loading ? <p>Cargando productos...</p> : null}
+          {!loading && error ? <p className="error-text">{error}</p> : null}
+          {!loading && !error && productos.length === 0 ? (
+            <p>No encontramos productos con ese filtro. Prueba otra categoria o cambia la busqueda.</p>
+          ) : null}
 
-          {!loading ? (
+          {!loading && !error ? (
             <div className="products-grid catalog-grid">
               {productos.map((producto) => (
                 <ProductCard key={producto.id_producto} producto={producto} onAdd={addToCart} />

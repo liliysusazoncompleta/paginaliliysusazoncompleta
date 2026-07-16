@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently \"pnpm --filter @lili/backend dev\" \"pnpm --filter @lili/frontend dev\"",
     "build": "pnpm -r build",
+    "deploy:frontend": "pnpm --filter @lili/frontend run deploy",
     "start": "pnpm --filter @lili/backend start",
     "lint": "pnpm -r lint"
   },

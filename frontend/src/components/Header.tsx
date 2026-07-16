@@ -1,6 +1,9 @@
 import { NavLink } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
 
+const logoUrl = `${import.meta.env.BASE_URL}logo-lili.png`;
+const fallbackLogoUrl = `${import.meta.env.BASE_URL}logo-lili-placeholder.svg`;
+
 type HeaderProps = {
   cartCount: number;
 };
@@ -10,10 +13,10 @@ export function Header({ cartCount }: HeaderProps) {
     <header className="header">
       <NavLink className="brand-inline" to="/">
         <img
-          src="/logo-lili.png"
+          src={logoUrl}
           alt="Lili y su Sazon Completa"
           onError={(event) => {
-            event.currentTarget.src = '/logo-lili-placeholder.svg';
+            event.currentTarget.src = fallbackLogoUrl;
           }}
         />
         <strong>Lili y su Sazon Completa</strong>

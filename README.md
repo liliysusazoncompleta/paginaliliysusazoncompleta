@@ -106,9 +106,14 @@ Crear `backend/.env` a partir de `backend/.env.example`:
 PORT=4000
 NODE_ENV=development
 DATABASE_URL=postgresql://postgres:TU_PASSWORD@localhost:5432/LiliysuSazonCompleta_DB
+# En produccion DATABASE_URL debe ser un Postgres accesible desde internet (no localhost).
+# DATABASE_SSL=true fuerza SSL (se activa solo si DATABASE_URL no es localhost).
+DATABASE_SSL=false
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
 WHATSAPP_PHONE=573177719249
+# Origen(es) permitidos por CORS, separados por coma si son varios.
+# En produccion: la URL de GitHub Pages (https://liliysusazoncompleta.github.io).
 FRONTEND_URL=http://localhost:5173
 
 # Envio de correo del formulario de Contacto (ver seccion "Envio de correo")
@@ -119,6 +124,11 @@ SMTP_PASS=
 CONTACT_TO_EMAIL=liliysusazoncompleto@gmail.com
 CONTACT_FROM_EMAIL=Lili y su Sazon Completa <no-reply@liliysusazoncompleta.com>
 ```
+
+> **Nota:** en desarrollo local, si `FRONTEND_URL` no esta definido, el backend acepta por
+> defecto `http://localhost:5173`, `http://127.0.0.1:5173` y `https://liliysusazoncompleta.github.io`
+> (ver `backend/src/config/env.ts`), asi que no es obligatorio configurarlo salvo que el
+> dominio de GitHub Pages cambie.
 
 ### Frontend (`frontend/.env`)
 
@@ -210,12 +220,12 @@ El boton **"Descargar Carta PDF"** (pagina `/catalogo`) genera siempre el catalo
 Al confirmar un pedido (`POST /api/pedidos/prefactura/pdf`), `backend/src/services/pdf.ts` → `buildPrefacturaPdf` genera una factura tamano carta con el formato de referencia del negocio:
 
 - Encabezado con logo, "PreFactura" (en rojo), nombre/Nit/telefonos/ciudad del negocio (centrado) y fechas de elaboracion/entrega/hora (a la derecha).
-- Cajas de **Datos del Cliente** e **Informacion para el Pago** (cuenta bancaria, nota de deposito y nota de que los asesores confirmaran el pedido al numero registrado). La altura de ambas cajas se ajusta automaticamente segun cuanto texto tengan.
-- Tabla de detalle (ITEM, DESCRIPCION, Cant., V. Unit., Total), Subtotal, Domicilio (si aplica, con nota aclarando que el valor se notificara en la factura enviada por Lili y su Sazon Completa) y TOTAL.
+- Cajas de **Datos del Cliente** y **Nota** (solo el aviso de que los asesores se comunicaran para confirmar el pedido al numero registrado; ya no muestra cuenta bancaria ni datos de pago). La altura de ambas cajas se ajusta automaticamente segun cuanto texto tengan.
+- Tabla de detalle (ITEM, DESCRIPCION, Cant., V. Unit., Total), Subtotal y TOTAL (el domicilio no se cobra ni se muestra como linea; solo aparece una nota aclarando que su valor se notificara en la factura enviada por Lili y su Sazon Completa).
 - Banner final "Gracias por tu compra!" con instrucciones de pago por WhatsApp, Instagram y direccion del negocio.
 - Nombre de archivo: `nombre_del_cliente_DDMMYYYY.pdf` (por ejemplo `monica_arango_11072026.pdf`), usando la fecha de elaboracion.
 
-Los datos del negocio, la cuenta bancaria y las notas se configuran por variables de entorno (`backend/.env`):
+Los datos del negocio y las notas se configuran por variables de entorno (`backend/.env`):
 
 ```env
 BUSINESS_NIT=43.089.544-4
@@ -224,15 +234,11 @@ BUSINESS_PHONE_FIXED=(604) 5955045
 BUSINESS_CITY=Medellin - Ant.
 BUSINESS_ADDRESS="Calle 112 # 51A-15, Medellin, Antioquia, Colombia"
 INSTAGRAM_HANDLE=@liliysusazoncompleta
-BANK_NAME=Bancolombia
-BANK_ACCOUNT_TYPE=Cuenta de Ahorros
-BANK_ACCOUNT_NUMBER=25300003634
-BANK_ACCOUNT_HOLDER=CRUZ MARIA VALENCIA
-BANK_ACCOUNT_HOLDER_ID=43089544
-PAYMENT_DEPOSIT_NOTE=Transfiere el 50% para confirmar tu pedido
 ADVISOR_CONFIRMATION_NOTE=Nuestros asesores se comunicaran para confirmar tu pedido al numero registrado.
 DELIVERY_NOTICE_NOTE=El valor del domicilio sera notificado en la factura enviada por Lili y su Sazon Completa.
 ```
+
+> `BANK_NAME`, `BANK_ACCOUNT_TYPE`, `BANK_ACCOUNT_NUMBER`, `BANK_ACCOUNT_HOLDER`, `BANK_ACCOUNT_HOLDER_ID` y `PAYMENT_DEPOSIT_NOTE` siguen soportados en `backend/.env` por si se vuelven a mostrar en el futuro, pero **ya no se imprimen** en la prefactura.
 
 > **Ojo con el simbolo `#`:** en un archivo `.env`, todo lo que va despues de un `#` se interpreta como comentario y se descarta, a menos que el valor completo vaya entre comillas. Por eso `BUSINESS_ADDRESS` va entre comillas dobles (tiene un `#` en la direccion) — sigue ese mismo patron si agregas otro valor con `#`, `%` no necesita comillas.
 
@@ -339,103 +345,278 @@ funciona igual que en produccion.
 - Menu principal siempre visible (header sticky) para facilitar la navegacion del cliente.
 - Microanimacion tipo vapor en identidad visual.
 
-## Despliegue en produccion (guia)
+## Despliegue en produccion (GitHub Pages + backend en la nube)
 
-1. Frontend
-- Construir con `pnpm --filter @lili/frontend build`.
-- Servir `frontend/dist` en CDN/hosting estatico (Vercel, Netlify, Nginx).
-- Configurar el hosting para servir `index.html` en cualquier ruta (SPA fallback), ya que el sitio usa rutas de React Router (`/catalogo`, `/contacto`, `/pedido`).
-- En este proyecto ya esta configurada la base para GitHub Pages de tipo proyecto en `frontend/vite.config.ts` (`base: '/paginaliliysusazoncompleta/'`) y el router usa `basename` en `frontend/src/main.tsx`.
+GitHub Pages **solo sirve archivos estaticos**: puede publicar el frontend compilado, pero
+no puede ejecutar el backend Node/Express ni conectarse a un Postgres que corra en
+`localhost` de tu computador. Por eso el sitio en `https://liliysusazoncompleta.github.io/paginaliliysusazoncompleta/`
+necesita 3 piezas desplegadas por separado:
 
-2. Backend
-- Construir con `pnpm --filter @lili/backend build`.
-- Ejecutar con `pnpm --filter @lili/backend start` en servidor/contenedor.
-- Configurar variables de entorno seguras (`DATABASE_URL`, `OPENAI_API_KEY`, `SMTP_*`).
-- **Importante:** GitHub Pages solo publica frontend estatico. El backend (API, IA, PDF, correo, base de datos) debe quedar desplegado aparte (por ejemplo en Render/Railway/VPS) y el frontend debe apuntar a esa API con `VITE_API_URL`.
+| Pieza      | Donde vive                                   | Config clave |
+| ---------- | --------------------------------------------- | ------------ |
+| Frontend   | GitHub Pages (estatico)                       | `frontend/.env.production` → `VITE_API_URL`, `VITE_ASSETS_URL` |
+| Backend    | Un host que ejecute Node (Render, Railway, Fly.io, VPS...) | `DATABASE_URL`, `FRONTEND_URL`, `SMTP_*`, etc. |
+| Base de datos | Un Postgres accesible por internet (Neon, Supabase, Render Postgres, Railway Postgres...) | `DATABASE_URL` del backend |
 
-3. Base de datos
-- Ejecutar migracion de `db/migrations` antes del primer despliegue.
+### 1) Base de datos: migrar Postgres a un proveedor en la nube
 
-4. Integracion WhatsApp
-- Actualmente via URL `wa.me`.
-- Para automatizaciones empresariales, migrar a WhatsApp Business API oficial.
-
-5. Correo
-- Reemplazar el sandbox de pruebas SMTP por un dominio de envio en produccion antes de lanzar (ver seccion "Envio de correo").
-
-## Actualizar repositorio y pagina en GitHub Pages (github.io)
-
-Si quieres subir cambios al repo y reflejarlos en tu pagina de GitHub Pages, sigue este flujo actualizado:
-
-### 1) Traer lo ultimo del repositorio
+Tu Postgres actual (`postgresql://postgres:***@localhost:5432/LiliysuSazonCompleta_DB`) solo
+es accesible desde tu propio computador, asi que un backend desplegado en internet no puede
+llegar a el. Elige un proveedor con capa gratuita (Neon, Supabase y Render Postgres son las
+opciones mas simples) y migra los datos:
 
 ```bash
-git checkout main
-git pull origin main
+# 1. Volcar tu base de datos local
+pg_dump -Fc -U postgres -h localhost -p 5432 LiliysuSazonCompleta_DB > lili_backup.dump
+
+# 2. Restaurar en la base de datos en la nube (reemplaza por tu connection string real)
+pg_restore -d "postgresql://usuario:password@host-remoto/nombre_bd?sslmode=require" lili_backup.dump
+```
+
+Guarda el connection string que te de el proveedor (empieza con `postgresql://...`,
+normalmente con `?sslmode=require`) — es tu nuevo `DATABASE_URL` de produccion.
+
+### 2) Backend: desplegar en un host que ejecute Node
+
+Este repo ya incluye `render.yaml` en la raiz para desplegar en [Render](https://render.com)
+con un clic (New > Blueprint > selecciona este repositorio). Si prefieres otro proveedor
+(Railway, Fly.io, un VPS con PM2/Docker), la idea es la misma:
+
+- Build: `pnpm install --frozen-lockfile && pnpm --filter @lili/backend build`
+- Start: `pnpm --filter @lili/backend start`
+- Variables de entorno obligatorias: `DATABASE_URL` (el de la nube, paso 1), `DATABASE_SSL=true`,
+  `FRONTEND_URL=https://liliysusazoncompleta.github.io`, `NODE_ENV=production`, mas las de
+  SMTP/OpenAI/negocio que ya usas en `backend/.env`.
+- Anota la URL publica que te asigne el proveedor (ej. `https://lili-sazon-backend.onrender.com`) — la necesitas en el paso siguiente.
+
+> El plan gratuito de Render "duerme" el servicio tras inactividad; la primera peticion
+> despues de dormir puede tardar unos segundos en responder. Es normal.
+
+### 3) Frontend: apuntar al backend real
+
+Edita `frontend/.env.production` (ya existe en el repo con placeholders) y reemplaza
+`TU_BACKEND_PUBLICO` por la URL del paso 2:
+
+```env
+VITE_API_URL=https://lili-sazon-backend.onrender.com/api
+VITE_ASSETS_URL=https://lili-sazon-backend.onrender.com/productos
+VITE_WHATSAPP_PHONE=573177719249
+```
+
+> Si `VITE_API_URL` queda apuntando a un backend inexistente o a `/api` (relativo), el
+> catalogo no cargara en GitHub Pages porque `github.io` no ejecuta tu backend.
+
+### 4) Publicar el frontend en GitHub Pages (paso a paso)
+
+Este repo queda preparado para publicar el frontend de forma manual con `gh-pages`, igual
+que en el flujo del proyecto administrativo adjunto. La publicacion sale desde la carpeta
+`frontend/dist`, no desde GitHub Actions.
+
+#### Resumen rapido
+
+Primera publicacion:
+
+```bash
 pnpm install
+git add .
+git commit -m "Prepara despliegue"
+git push origin main
+pnpm deploy:frontend
 ```
 
-### 2) Aplicar tus cambios localmente
-
-Edita el proyecto (frontend o backend), prueba en local y valida build:
-
-```bash
-pnpm dev
-pnpm build
-```
-
-Si vas a publicar en Pages, valida tambien el build del frontend por separado:
-
-```bash
-pnpm --filter @lili/frontend build
-```
-
-### 3) Subir cambios al repositorio
+Publicaciones posteriores:
 
 ```bash
 git add .
-git commit -m "Actualiza contenido y ajustes del sitio"
+git commit -m "Actualiza sitio"
 git push origin main
+pnpm deploy:frontend
 ```
 
-### 4) Configurar GitHub Pages correctamente (una sola vez)
+#### Paso 4.1) Confirmar el nombre del repositorio
 
-En GitHub: **Settings > Pages**
+En este proyecto, `frontend/vite.config.ts` usa:
 
-- Source: **Deploy from a branch**
-- Branch: **gh-pages**
-- Folder: **/(root)**
+```ts
+base: '/paginaliliysusazoncompleta/'
+```
 
-> Si dejas `main` + `/(root)`, GitHub Pages mostrara el `README.md` del repositorio en vez del frontend compilado.
+Eso significa que GitHub Pages publicara el frontend bajo:
 
-### 5) Publicar/actualizar el frontend en GitHub Pages
+```text
+https://TU_USUARIO.github.io/paginaliliysusazoncompleta/
+```
 
-Compila solo el frontend:
+Si cambias el nombre del repositorio, tambien debes actualizar ese `base` en
+`frontend/vite.config.ts`; de lo contrario, el sitio puede abrir sin estilos, sin logo o
+sin rutas funcionando correctamente.
+
+#### Paso 4.2) Revisar `frontend/.env.production`
+
+Antes de publicar, deja configurado el frontend para apuntar al backend real:
+
+```env
+VITE_API_URL=https://lili-sazon-backend.onrender.com/api
+VITE_ASSETS_URL=https://lili-sazon-backend.onrender.com/productos
+VITE_WHATSAPP_PHONE=573177719249
+```
+
+Si aqui dejas una URL placeholder, una URL caida o un `/api` relativo, el catalogo no
+cargara cuando el sitio este en `github.io`.
+
+#### Paso 4.3) Instalar dependencias y compilar el frontend
+
+Desde la raiz del repo:
+
+```bash
+pnpm install
+pnpm build
+```
+
+Si solo quieres compilar/publicar el frontend, tambien puedes usar:
 
 ```bash
 pnpm --filter @lili/frontend build
 ```
 
-Publica la carpeta `frontend/dist` a la rama `gh-pages`:
+Si este build falla, no sigas con la publicacion hasta corregirlo.
+
+#### Paso 4.4) Publicar a la rama `gh-pages`
+
+Desde la raiz del repo:
 
 ```bash
-git subtree push --prefix frontend/dist origin gh-pages
+pnpm deploy:frontend
 ```
 
-> Si `gh-pages` no existe, GitHub la crea al primer push. Luego, en **Settings > Pages** del repositorio, selecciona **Deploy from a branch** y la rama **gh-pages** (root).
+O, si prefieres hacerlo dentro de `frontend/`:
 
-### 6) Esperar despliegue y validar
+```bash
+cd frontend
+pnpm run deploy
+```
 
-Despues de 1-3 minutos, revisa tu URL de Pages:
+Ese comando hace esto:
 
-- Sitio usuario/organizacion: `https://liliysusazoncompleta.github.io/`
-- Sitio de proyecto: `https://liliysusazoncompleta.github.io/paginaliliysusazoncompleta/`
+1. Ejecuta el build del frontend.
+2. Toma el contenido de `frontend/dist`.
+3. Lo publica en la rama `gh-pages` del repositorio.
 
-Si no carga cambios de inmediato, fuerza recarga del navegador (Ctrl+F5) y confirma en la pestaña **Actions** que el despliegue de Pages termino en estado exitoso.
+> La rama `gh-pages` no la editas a mano. La genera y actualiza el comando de deploy.
 
-### 7) (Opcional) Publicar cambios del backend en produccion
+#### Paso 4.5) Configurar GitHub Pages en el repositorio
 
-Si tus cambios afectan API, chatbot IA, envio de correo o generacion de PDF, recuerda desplegar tambien el backend y actualizar en frontend la variable `VITE_API_URL` al dominio real del backend (por ejemplo `https://api.tu-dominio.com/api`).
+En GitHub, entra a tu repositorio y configura esto una sola vez:
+
+1. Abre **Settings**.
+2. En el menu lateral, entra a **Pages**.
+3. En **Source**, selecciona **Deploy from a branch**.
+4. En **Branch**, selecciona `gh-pages`.
+5. En **Folder**, deja `/(root)`.
+6. Guarda la configuracion.
+
+> Si la rama `gh-pages` aun no aparece, ejecuta primero `pnpm deploy:frontend` una vez y
+> luego vuelve a **Settings > Pages** para seleccionarla.
+
+#### Paso 4.6) Hacer commit de la configuracion final
+
+Conviene dejar la configuracion publicada tambien guardada en el repositorio, para no perder
+el estado del despliegue entre maquinas o ramas. Antes de publicar:
+
+```bash
+git status
+git add frontend/.env.production frontend/src README.md package.json frontend/package.json pnpm-lock.yaml
+git commit -m "Prepara despliegue a GitHub Pages"
+```
+
+Si tienes mas cambios validos para publicar, puedes hacer `git add .` en lugar de agregar
+archivos puntuales.
+
+#### Paso 4.7) Subir a `main`
+
+Si tambien vas a desplegar el backend con Render/Railway desde `main`, sube tus cambios
+normales al repositorio:
+
+```bash
+git push origin main
+```
+
+Eso publica el codigo fuente actualizado. La pagina estara visible en GitHub Pages cuando
+hayas corrido `pnpm deploy:frontend`.
+
+#### Paso 4.8) Verificar la publicacion
+
+Despues de correr `pnpm deploy:frontend`:
+
+1. Espera a que GitHub Pages actualice la rama `gh-pages`.
+2. Abre la URL publicada.
+3. Si aun ves la version vieja, recarga sin cache con `Ctrl + F5`.
+
+La URL esperada para este repo es:
+
+```text
+https://liliysusazoncompleta.github.io/paginaliliysusazoncompleta/
+```
+
+#### Paso 4.9) Comprobar que quedo bien
+
+Al abrir la web publicada, verifica al menos esto:
+
+1. El logo aparece en el header.
+2. Navegan bien `/`, `/catalogo`, `/contacto` y `/pedido`.
+3. El catalogo muestra productos reales.
+4. Las imagenes de productos cargan desde el backend.
+5. El chat y el formulario de contacto no muestran errores de conexion.
+
+#### Paso 4.10) Si GitHub Pages publica pero la pagina falla
+
+Los fallos mas comunes son estos:
+
+1. El sitio abre, pero el catalogo no carga.
+   Causa habitual: `frontend/.env.production` apunta a un backend incorrecto o el backend esta apagado.
+2. El sitio abre sin logo o con rutas rotas.
+   Causa habitual: el nombre del repo no coincide con el `base` de `frontend/vite.config.ts`.
+3. `pnpm deploy:frontend` falla localmente.
+   Revisa el build del frontend; normalmente sera por TypeScript, dependencias sin instalar o un archivo `.env.production` mal preparado.
+4. El backend responde localmente pero no en produccion.
+   Verifica `DATABASE_URL`, `DATABASE_SSL=true`, `FRONTEND_URL` y que el proveedor (Render/Railway) haya terminado de desplegar.
+
+#### Paso 4.11) Comando completo para publicar cambios normales
+
+Cuando ya dejaste Pages configurado una vez, el ciclo normal de publicacion queda asi:
+
+```bash
+git add .
+git commit -m "Actualiza sitio"
+git push origin main
+pnpm deploy:frontend
+```
+
+Si prefieres publicar primero y luego subir el codigo fuente, tambien funciona; lo importante
+es no olvidar el `pnpm deploy:frontend`, porque ese es el paso que actualiza `github.io`.
+
+#### Paso 4.12) Checklist final antes de publicar
+
+1. `frontend/.env.production` apunta al backend real.
+2. `pnpm build` termina sin errores.
+3. El repo ya tiene Pages configurado con rama `gh-pages`.
+4. Ya hiciste `git push origin main` si quieres dejar el codigo fuente actualizado en GitHub.
+5. Ejecutaste `pnpm deploy:frontend`.
+
+### 5) Migraciones SQL
+
+Ejecuta las migraciones de `db/migrations` contra la base de datos en la nube (paso 1)
+antes del primer despliegue del backend.
+
+### 6) Integracion WhatsApp
+
+Actualmente via URL `wa.me`. Para automatizaciones empresariales, migrar a WhatsApp
+Business API oficial.
+
+### 7) Correo
+
+Reemplaza el sandbox de pruebas de Mailtrap por un dominio de envio en produccion antes
+de lanzar (ver seccion "Envio de correo").
 
 ## Roadmap sugerido
 

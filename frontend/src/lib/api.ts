@@ -1,13 +1,53 @@
 import type { CartItem, Categoria, ClienteForm, Producto } from '../types';
 
-const API = import.meta.env.VITE_API_URL ?? '/api';
+const API = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '');
+const API_TIMEOUT_MS = 12_000;
+
+function isMissingProductionApiConfig() {
+  return !API || /TU_BACKEND_PUBLICO/i.test(API);
+}
+
+function ensureProductionApiConfig() {
+  if (typeof window === 'undefined') return;
+
+  const isGithubPages = /github\.io$/i.test(window.location.hostname);
+  const isRelativeApi = API.startsWith('/');
+
+  if (isMissingProductionApiConfig()) {
+    throw new Error(
+      'Configuracion faltante: define VITE_API_URL con la URL publica de tu backend y vuelve a publicar el frontend.',
+    );
+  }
+
+  // In GitHub Pages there is no backend runtime. A relative /api URL means
+  // requests are sent to github.io instead of your real API server.
+  if (isGithubPages && isRelativeApi) {
+    throw new Error(
+      'Configuracion faltante: define VITE_API_URL con la URL publica de tu backend (ej. https://tu-backend.com/api) y vuelve a publicar el frontend.',
+    );
+  }
+}
 
 async function fetchJson(url: string, options?: RequestInit) {
+  ensureProductionApiConfig();
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
   try {
-    const res = await fetch(url, options);
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
     return res;
-  } catch {
-    throw new Error('No se pudo conectar al backend. Verifica que el servidor este activo en http://localhost:4000 y ejecuta pnpm dev desde la raiz.');
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('El backend tardo demasiado en responder. Si esta en Render o Railway, espera a que despierte e intenta de nuevo.');
+    }
+
+    throw new Error('No se pudo conectar al backend. Verifica que el servidor este activo en http://localhost:4000 o que VITE_API_URL apunte a tu backend publicado.');
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
