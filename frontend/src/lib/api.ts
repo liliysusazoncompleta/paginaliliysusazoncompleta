@@ -45,7 +45,11 @@ async function fetchJson(url: string, options?: RequestInit) {
       throw new Error('El backend tardo demasiado en responder. Si esta en Render o Railway, espera a que despierte e intenta de nuevo.');
     }
 
-    throw new Error('No se pudo conectar al backend. Verifica que el servidor este activo en http://localhost:4000 o que VITE_API_URL apunte a tu backend publicado.');
+    throw new Error(
+      `No se pudo conectar al backend en ${API}. Puede ser: (1) el backend esta caido o no termino de desplegar, ` +
+        '(2) el backend no permite este origen por CORS (revisa FRONTEND_URL en su configuracion), o ' +
+        '(3) VITE_API_URL no es correcto. Abre la URL de arriba + /health en el navegador para confirmar si el backend responde.',
+    );
   } finally {
     window.clearTimeout(timeoutId);
   }
