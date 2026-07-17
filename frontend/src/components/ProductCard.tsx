@@ -44,22 +44,15 @@ const keywordImageMap: Array<{ keyword: RegExp; url: string }> = [
   },
 ];
 
-// Origen del backend (derivado de VITE_API_URL quitando el "/api" final), para
-// poder resolver rutas absolutas como "/uploads/productos/x.jpg" o
-// "/productos/x.jpg" contra el dominio del backend en vez del dominio del
-// frontend (github.io) cuando quedan en dominios distintos.
-const API_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '');
-const API_ORIGIN = /^https?:\/\//i.test(API_URL) ? new URL(API_URL).origin : '';
-
-// Carpeta de fotos de producto para el caso "solo nombre de archivo". Por
-// defecto usa /uploads/productos (formato del panel admin); se puede
-// sobreescribir con VITE_ASSETS_URL si el backend sirve las imagenes en otra ruta.
-const ASSETS_BASE = (import.meta.env.VITE_ASSETS_URL ?? `${API_ORIGIN}/uploads/productos`).replace(/\/$/, '');
+// Carpeta de fotos de producto, servida en vivo por el backend (ver
+// backend/public/productos/README.md) tanto en dev como en produccion. Si el
+// frontend y el backend quedan en dominios distintos, VITE_ASSETS_URL debe
+// apuntar a la URL absoluta del backend (ej. https://api.tu-dominio.com/productos).
+const ASSETS_BASE = (import.meta.env.VITE_ASSETS_URL ?? '/productos').replace(/\/$/, '');
 
 // Acepta 3 formas en productos.imagen_url:
 //  - URL externa completa: "https://..."
-//  - Ruta ya absoluta: "/uploads/productos/archivo.jpg" o "/productos/archivo.jpg"
-//    (se resuelve contra el dominio del backend, no el del frontend)
+//  - Ruta ya absoluta: "/productos/archivo.jpg" o "https://..."
 //  - Solo el nombre del archivo: "archivo.jpg" (se resuelve contra ASSETS_BASE)
 function resolveImageUrl(url: string | null): string | null {
   if (!url) return null;
@@ -71,7 +64,7 @@ function resolveImageUrl(url: string | null): string | null {
   }
 
   if (trimmed.startsWith('/')) {
-    return `${API_ORIGIN}${trimmed}`;
+    return trimmed;
   }
 
   return `${ASSETS_BASE}/${trimmed}`;

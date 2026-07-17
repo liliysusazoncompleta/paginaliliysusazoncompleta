@@ -18,12 +18,6 @@ export default defineConfig({
         target: 'http://localhost:4000',
         changeOrigin: true,
       },
-      // Fotos de producto subidas via el panel admin (admonliliysusazoncompleta),
-      // servidas por ese backend en /uploads/productos/*.
-      '/uploads': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-      },
     },
   },
 });
