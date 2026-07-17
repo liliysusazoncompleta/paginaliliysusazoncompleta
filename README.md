@@ -19,6 +19,35 @@ Permitir que clientes:
 
 > El flujo publico **no guarda pedidos en base de datos**. Solo lee catalogo/clientes, genera prefactura y redirige a WhatsApp.
 
+## Arquitectura de backend (dos backends, una sola base de datos)
+
+Este sitio comparte la base de datos Postgres de produccion con el panel
+administrativo interno **`admonliliysusazoncompleta`** (repositorio aparte).
+Actualmente `VITE_API_URL` del frontend apunta a **ese** backend, no al
+`backend/` de este repositorio, porque es el que ya esta desplegado y
+conectado a la base de datos real:
+
+| Funcionalidad | Backend que la resuelve hoy | Detalle |
+| --- | --- | --- |
+| Categorias (`/api/catalogo/categorias`) | `admonliliysusazoncompleta` | Rutas nuevas agregadas ahi (`server/routes/catalogoPublico.routes.js`), sin autenticacion, solo lectura. |
+| Productos (`/api/catalogo/productos`) | `admonliliysusazoncompleta` | Idem, `server/controllers/catalogoPublicoController.js`. |
+| Imagenes de producto | `backend/` **de este repo** | Carpeta `backend/public/productos/` + `pnpm sync-images` (ver seccion "Imagenes de productos" abajo). No usa las imagenes que sube el panel admin. |
+| Prefactura / carta PDF / contacto / chatbot IA | `backend/` **de este repo** (pendiente de desplegar) | Estas rutas (`/api/pedidos/*`, `/api/contacto`, `/api/ia/*`) **no existen** en `admonliliysusazoncompleta`, asi que no funcionan mientras `VITE_API_URL` apunte solo a ese backend. |
+
+**Consecuencia practica:** con la configuracion actual de `frontend/.env.production`,
+el catalogo (categorias + productos) carga correctamente, pero **el checkout
+(generar prefactura), el formulario de Contacto y el chatbot no responden**,
+porque esas rutas viven en el `backend/` de este repo y ese backend todavia
+no esta desplegado con una URL propia. Para restaurarlas hay dos caminos:
+
+1. Desplegar `backend/` de este repo por separado (usa `render.yaml` o
+   `railway.json` en la raiz) y ajustar el frontend para usar esa URL en las
+   llamadas que correspondan (`generarPrefactura`, `descargarPrefacturaPdf`,
+   `sendContactMessage`, `getChatbotAnswer`, `getCatalogoPdfUrl`), o
+2. Portar esas rutas tambien a `admonliliysusazoncompleta`, siguiendo el
+   mismo patron que `catalogoPublico.routes.js` (publicas o protegidas con
+   `apiKeyAuth`, segun el caso).
+
 ## Paginas del sitio (frontend)
 
 El frontend es una SPA multipagina (`react-router-dom`), con un layout compartido (header + footer + chat + boton flotante de WhatsApp) y estas rutas:
@@ -87,6 +116,8 @@ paginaliliysusazoncompleta/
 ├── .gitignore
 ├── package.json
 ├── pnpm-workspace.yaml
+├── render.yaml           # Deploy del backend en Render (Blueprint)
+├── railway.json          # Deploy del backend en Railway
 └── README.md
 ```
 
@@ -142,6 +173,18 @@ VITE_WHATSAPP_PHONE=573177719249
 # VITE_ASSETS_URL=https://api.tu-dominio.com/productos
 ```
 
+En **produccion** (`frontend/.env.production`), `VITE_API_URL` y `VITE_ASSETS_URL`
+hoy apuntan a backends distintos (ver "Arquitectura de backend" arriba):
+
+```env
+# Categorias/productos: backend del panel admin (admonliliysusazoncompleta).
+VITE_API_URL=https://admonliliysusazoncompleta-production.up.railway.app/api
+# Imagenes de producto: backend propio de este repo (backend/public/productos).
+# Reemplaza TU_BACKEND_PUBLICO cuando despliegues backend/ (render.yaml o railway.json).
+VITE_ASSETS_URL=https://TU_BACKEND_PUBLICO/productos
+VITE_WHATSAPP_PHONE=573177719249
+```
+
 ## Migraciones SQL
 
 La migracion requerida esta en:
@@ -191,6 +234,10 @@ pnpm start
 
 ## Endpoints principales
 
+Definidos en `backend/` (este repo). En produccion, categorias/productos se
+sirven en la practica desde `admonliliysusazoncompleta` (ver "Arquitectura de
+backend" arriba); el resto solo funciona si `backend/` esta desplegado.
+
 - `GET /api/catalogo/categorias` — categorias activas, sin las administrativas ocultas.
 - `GET /api/catalogo/productos?categoriaId=&search=`
 - `GET /api/catalogo/pdf` — descarga `Carta_Lili_Sazon_Completa.pdf` (catalogo completo, tamano carta).
@@ -199,6 +246,12 @@ pnpm start
 - `POST /api/pedidos/prefactura`
 - `POST /api/pedidos/prefactura/pdf`
 - `POST /api/contacto` — envia el formulario de Contacto por correo (nuevo).
+
+En `admonliliysusazoncompleta/server` (repositorio aparte), agregados para que
+la tienda publica pueda leer el catalogo sin login:
+
+- `GET /api/catalogo/categorias` — `server/routes/catalogoPublico.routes.js`, publica.
+- `GET /api/catalogo/productos?categoriaId=&search=` — idem, publica.
 
 ## Categorias ocultas de la tienda publica
 
@@ -379,8 +432,10 @@ normalmente con `?sslmode=require`) — es tu nuevo `DATABASE_URL` de produccion
 ### 2) Backend: desplegar en un host que ejecute Node
 
 Este repo ya incluye `render.yaml` en la raiz para desplegar en [Render](https://render.com)
-con un clic (New > Blueprint > selecciona este repositorio). Si prefieres otro proveedor
-(Railway, Fly.io, un VPS con PM2/Docker), la idea es la misma:
+con un clic (New > Blueprint > selecciona este repositorio), y `railway.json` para
+desplegar en [Railway](https://railway.app) (New > GitHub Repo > selecciona este
+repositorio; Railway detecta `railway.json` y usa esos comandos de build/arranque
+automaticamente). Si prefieres otro proveedor (Fly.io, un VPS con PM2/Docker), la idea es la misma:
 
 - Build: `pnpm install --frozen-lockfile && pnpm --filter @lili/backend build`
 - Start: `pnpm --filter @lili/backend start`
