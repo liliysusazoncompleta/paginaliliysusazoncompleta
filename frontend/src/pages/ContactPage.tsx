@@ -158,13 +158,13 @@ export function ContactPage() {
               <h3>Horarios de Atencion</h3>
               <div className="hours-list">
                 <p>
-                  <span>Lunes - Viernes</span> <strong>11:00 AM - 8:00 PM</strong>
+                  <span>Lunes - Viernes</span> <strong>09:00 AM - 6:00 PM</strong>
                 </p>
                 <p>
-                  <span>Sabados</span> <strong>12:00 PM - 9:00 PM</strong>
+                  <span>Sabados</span> <strong>9:00 AM - 1:00 PM</strong>
                 </p>
                 <p>
-                  <span>Domingos</span> <strong className="closed">Cerrado</strong>
+                  <span>Domingos y Festivos</span> <strong className="closed">Cerrado</strong>
                 </p>
               </div>
             </div>
