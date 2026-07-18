@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Lili y su Sazon Completa</title>
+    <script type="text/javascript">
+      // Truco estandar para que las rutas de React Router (SPA) funcionen en
+      // GitHub Pages: https://github.com/rafgraph/spa-github-pages
+      // GitHub Pages no sabe que /catalogo, /contacto, /pedido son rutas del
+      // frontend (no archivos reales), asi que al recargar la pagina en esas
+      // rutas devuelve 404. Este archivo intercepta ese 404 y redirige a la
+      // raiz codificando la ruta original en el query string; index.html la
+      // decodifica y la restaura antes de que React Router tome control.
+      var pathSegmentsToKeep = 1; // mantiene "/paginaliliysusazoncompleta"
+
+      var l = window.location;
+      l.replace(
+        l.protocol +
+          '//' +
+          l.hostname +
+          (l.port ? ':' + l.port : '') +
+          l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') +
+          '/?/' +
+          l.pathname
+            .slice(1)
+            .split('/')
+            .slice(pathSegmentsToKeep)
+            .join('/')
+            .replace(/&/g, '~and~') +
+          (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+          l.hash,
+      );
+    </script>
+  </head>
+  <body></body>
+</html>
