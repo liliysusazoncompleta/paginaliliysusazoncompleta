@@ -36,6 +36,17 @@ const SYNONYMS = { pay: 'pie' };
 
 const DIACRITICS_RE = new RegExp('[' + String.fromCharCode(0x0300) + '-' + String.fromCharCode(0x036f) + ']', 'g');
 
+// Solo para mensajes de error: muestra host/puerto/nombre de base de datos,
+// nunca el usuario ni la password.
+function safeHost(connectionString) {
+  try {
+    const u = new URL(connectionString);
+    return `${u.hostname}:${u.port || '5432'}${u.pathname}`;
+  } catch {
+    return '(no se pudo interpretar DATABASE_URL)';
+  }
+}
+
 function normalize(text) {
   return text
     // separa palabras pegadas en "camelCase" (ej. "TerrinaDePollo" -> "Terrina De Pollo")
@@ -110,8 +121,35 @@ async function main() {
     );
   }
 
-  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
-  await client.connect();
+  // Mismo auto-detect de SSL que backend/src/config/env.ts: los Postgres en la
+  // nube (Railway, Render, Neon, Supabase...) casi siempre lo exigen. Sin esto,
+  // conectar contra una base de datos remota puede fallar (a veces con un
+  // error de autenticacion poco claro en vez de uno de SSL).
+  const databaseUrl = process.env.DATABASE_URL ?? '';
+  const databaseSsl =
+    process.env.DATABASE_SSL === 'true' ||
+    (process.env.DATABASE_SSL !== 'false' && !!databaseUrl && !/localhost|127\.0\.0\.1/.test(databaseUrl));
+
+  const client = new pg.Client({
+    connectionString: databaseUrl,
+    ssl: databaseSsl ? { rejectUnauthorized: false } : undefined,
+  });
+
+  try {
+    await client.connect();
+  } catch (error) {
+    console.error('\nNo se pudo conectar a la base de datos.');
+    console.error(`DATABASE_URL (host): ${safeHost(databaseUrl)}`);
+    console.error(`SSL: ${databaseSsl ? 'activado' : 'desactivado'}`);
+    console.error(
+      '\nSi el error es de autenticacion (password/usuario), revisa que DATABASE_URL en backend/.env',
+      'tenga exactamente el mismo usuario/password/host/puerto/nombre de base de datos que usa',
+      'admonliliysusazoncompleta (comparten la misma base). Copia el connection string desde ahi en vez',
+      'de escribirlo a mano, y si la password tiene caracteres especiales (@ # : / % espacio) asegurate',
+      'de que esten "percent-encoded" en la URL.\n',
+    );
+    throw error;
+  }
 
   const { rows: productos } = await client.query(
     `SELECT id_producto, codigo, nombre, imagen_url FROM productos WHERE activo = true ORDER BY nombre ASC`,
