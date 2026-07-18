@@ -93,4 +93,27 @@ export function ProductCard({ producto, onAdd }: ProductCardProps) {
           decoding="async"
           onError={(event) => {
             const img = event.currentTarget;
-            if (img.dataset.fallbackAp
+            if (img.dataset.fallbackApplied) return;
+            img.dataset.fallbackApplied = 'true';
+            img.src = getImageByTitle(producto.nombre);
+          }}
+        />
+        <span className="category-tag overlay-tag">{producto.categoria}</span>
+        {producto.presentacion ? (
+          <span className="presentation-badge overlay-tag">{producto.presentacion}</span>
+        ) : null}
+      </div>
+      <div className="product-content">
+        <h3>{producto.nombre}</h3>
+        <p>{producto.descripcion || 'Preparacion casera con el sabor especial de Lili.'}</p>
+
+        <div className="card-foot">
+          <strong>{formatCOP(producto.valor)}</strong>
+          <button className="add-round-btn" onClick={() => onAdd(producto)} aria-label={`Agregar ${producto.nombre}`}>
+            <Plus size={18} />
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
