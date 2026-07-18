@@ -31,19 +31,25 @@ conectado a la base de datos real:
 | --- | --- | --- |
 | Categorias (`/api/catalogo/categorias`) | `admonliliysusazoncompleta` | Rutas nuevas agregadas ahi (`server/routes/catalogoPublico.routes.js`), sin autenticacion, solo lectura. |
 | Productos (`/api/catalogo/productos`) | `admonliliysusazoncompleta` | Idem, `server/controllers/catalogoPublicoController.js`. |
-| Imagenes de producto | `backend/` **de este repo** | Carpeta `backend/public/productos/` + `pnpm sync-images` (ver seccion "Imagenes de productos" abajo). No usa las imagenes que sube el panel admin. |
-| Prefactura / carta PDF / contacto / chatbot IA | `backend/` **de este repo** (pendiente de desplegar) | Estas rutas (`/api/pedidos/*`, `/api/contacto`, `/api/ia/*`) **no existen** en `admonliliysusazoncompleta`, asi que no funcionan mientras `VITE_API_URL` apunte solo a ese backend. |
+| Imagenes de producto | `backend/` **de este repo**, ya desplegado en Railway | Carpeta `backend/public/productos/` + `pnpm sync-images` (ver seccion "Imagenes de productos" abajo). No usa las imagenes que sube el panel admin. |
+| Prefactura / carta PDF / contacto / chatbot IA | `backend/` **de este repo**, desplegado pero **el frontend aun no le apunta** | Estas rutas (`/api/pedidos/*`, `/api/contacto`, `/api/ia/*`) **no existen** en `admonliliysusazoncompleta`. `VITE_API_URL` sigue apuntando solo a ese backend (para categorias/productos), asi que checkout/contacto/chatbot no responden todavia en produccion. |
 
-**Consecuencia practica:** con la configuracion actual de `frontend/.env.production`,
-el catalogo (categorias + productos) carga correctamente, pero **el checkout
-(generar prefactura), el formulario de Contacto y el chatbot no responden**,
-porque esas rutas viven en el `backend/` de este repo y ese backend todavia
-no esta desplegado con una URL propia. Para restaurarlas hay dos caminos:
+**Estado actual:** `backend/` de este repo ya esta desplegado en Railway
+(servicio `paginaliliysusazoncompleta`, Root Directory `/backend` — ver
+seccion de despliegue mas abajo), y `VITE_ASSETS_URL` ya apunta ahi, asi que
+las imagenes de producto cargan igual en dev y en produccion **siempre que la
+base de datos de produccion tenga `imagen_url` sincronizado** (ver aviso en
+"Imagenes de productos"). Lo que sigue pendiente es el checkout (generar
+prefactura), el formulario de Contacto y el chatbot, porque esas rutas viven
+en `backend/` y `VITE_API_URL` todavia no apunta ahi (sigue apuntando a
+`admonliliysusazoncompleta`, que no las tiene). Para restaurarlas hay dos
+caminos:
 
-1. Desplegar `backend/` de este repo por separado (usa `render.yaml` o
-   `railway.json` en la raiz) y ajustar el frontend para usar esa URL en las
-   llamadas que correspondan (`generarPrefactura`, `descargarPrefacturaPdf`,
-   `sendContactMessage`, `getChatbotAnswer`, `getCatalogoPdfUrl`), o
+1. Ajustar el frontend para que las llamadas que correspondan
+   (`generarPrefactura`, `descargarPrefacturaPdf`, `sendContactMessage`,
+   `getChatbotAnswer`, `getCatalogoPdfUrl`) usen la URL de `backend/`
+   (`https://paginaliliysusazoncompleta-production.up.railway.app/api`) en
+   vez de `VITE_API_URL`, o
 2. Portar esas rutas tambien a `admonliliysusazoncompleta`, siguiendo el
    mismo patron que `catalogoPublico.routes.js` (publicas o protegidas con
    `apiKeyAuth`, segun el caso).
@@ -117,9 +123,18 @@ paginaliliysusazoncompleta/
 ├── package.json
 ├── pnpm-workspace.yaml
 ├── render.yaml           # Deploy del backend en Render (Blueprint)
-├── railway.json          # Deploy del backend en Railway
+├── railway.json          # Deploy del backend en Railway (Root Directory = raiz del repo)
+├── nixpacks.toml         # Fases de build si Railway usa la raiz del repo como Root Directory
 └── README.md
 ```
+
+> `backend/` tambien tiene su **propio** `nixpacks.toml`
+> (`backend/nixpacks.toml`), usado cuando el servicio de Railway tiene
+> configurado **Root Directory = `/backend`** (que es como esta desplegado
+> hoy este proyecto) — en ese caso Railway ignora el `railway.json` y
+> `nixpacks.toml` de la raiz porque quedan fuera del contexto de build. Ver
+> "Backend: desplegar en un host que ejecute Node" mas abajo para el detalle
+> de por que existen ambos.
 
 ## Requisitos
 
@@ -179,9 +194,8 @@ hoy apuntan a backends distintos (ver "Arquitectura de backend" arriba):
 ```env
 # Categorias/productos: backend del panel admin (admonliliysusazoncompleta).
 VITE_API_URL=https://admonliliysusazoncompleta-production.up.railway.app/api
-# Imagenes de producto: backend propio de este repo (backend/public/productos).
-# Reemplaza TU_BACKEND_PUBLICO cuando despliegues backend/ (render.yaml o railway.json).
-VITE_ASSETS_URL=https://TU_BACKEND_PUBLICO/productos
+# Imagenes de producto: backend propio de este repo, ya desplegado en Railway.
+VITE_ASSETS_URL=https://paginaliliysusazoncompleta-production.up.railway.app/productos
 VITE_WHATSAPP_PHONE=573177719249
 ```
 
@@ -350,6 +364,17 @@ quedarian con el logo por no tener coincidencia, y los archivos que sobraron sin
 usarse — antes de correr `pnpm sync-images:apply` para escribir de verdad en la base
 de datos. Mas detalle en `backend/public/productos/README.md`.
 
+> **Importante — corre el script contra la base de datos de PRODUCCION, no solo
+> en local.** `pnpm sync-images:apply` escribe usando el `DATABASE_URL` que tenga
+> `backend/.env` en ese momento. Si solo lo corriste una vez contra tu Postgres
+> local, `imagen_url` queda sincronizado ahi (por eso en `pnpm dev` las fotos y el
+> logo de respaldo se ven correctos), pero la base de datos compartida en la nube
+> (la misma que usa `admonliliysusazoncompleta`) puede seguir con `imagen_url`
+> vacio o desactualizado, y en produccion se veran fotos genericas del banco de
+> Unsplash en vez de las fotos reales o el logo. Para corregirlo, apunta
+> temporalmente `backend/.env` → `DATABASE_URL` al Postgres de produccion y vuelve
+> a correr `pnpm sync-images` (revisa el reporte) y luego `pnpm sync-images:apply`.
+
 **Resolucion de imagenes (en orden):**
 
 1. `productos.imagen_url` (si esta definido y el archivo existe).
@@ -446,6 +471,47 @@ automaticamente). Si prefieres otro proveedor (Fly.io, un VPS con PM2/Docker), l
 
 > El plan gratuito de Render "duerme" el servicio tras inactividad; la primera peticion
 > despues de dormir puede tardar unos segundos en responder. Es normal.
+
+#### Notas del despliegue real en Railway (Root Directory = `/backend`)
+
+Este proyecto quedo desplegado en Railway con **Root Directory = `/backend`**
+(Settings → Root Directory), no la raiz del repo. Eso importa porque Railway
+solo lee archivos de configuracion (`nixpacks.toml`, `railway.json`) que
+esten **dentro** de esa carpeta — por eso existe `backend/nixpacks.toml`
+ademas del `nixpacks.toml`/`railway.json` de la raiz (que solo aplican si
+alguna vez cambias Root Directory a la raiz del repo).
+
+Dos problemas se resolvieron ahi durante el primer despliegue, por si vuelven
+a aparecer con otro proveedor o version de Nixpacks:
+
+1. **`corepack prepare pnpm@... --activate` falla con `Internal Error: Cannot
+   find matching keyid`.** Es un bug conocido de `corepack` verificando la
+   firma del paquete `pnpm` contra su base de llaves interna, en algunas
+   imagenes de Nixpacks. Se evita no usando `corepack`: como
+   `backend/package.json` no depende de nada del workspace pnpm (`workspace:`
+   protocol), se instala con `npm` directamente.
+2. **`sh: tsc: not found` aunque el install "corrio bien".** Nixpacks fija
+   `NODE_ENV=production` por defecto durante el build, y un `npm install`
+   plano respeta esa variable y **omite `devDependencies`** (donde vive
+   `typescript`). Se soluciona forzando `npm install --include=dev`.
+
+`backend/nixpacks.toml` resultante:
+
+```toml
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm install --include=dev"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
+```
 
 ### 3) Frontend: apuntar al backend real
 
