@@ -7,13 +7,42 @@ type ProductCardProps = {
   onAdd: (producto: Producto) => void;
 };
 
-// Si el producto no tiene foto real (imagen_url vacio) o la foto no carga
-// (404, backend caido, etc.), se muestra siempre el logo del negocio en vez
-// de fotos de stock genericas. Mismos archivos que usa el Header, para que
-// funcionen igual en dev y en produccion (respetan el "base" de Vite, que en
-// GitHub Pages es /paginaliliysusazoncompleta/).
-const logoFallback = `${import.meta.env.BASE_URL}logo-lili.png`;
-const placeholderFallback = `${import.meta.env.BASE_URL}logo-lili-placeholder.svg`;
+// Tamano reducido (w=640, q=60) para tarjetas pequenas: se ve nitido en pantalla
+// y pesa varias veces menos que las imagenes de 1200px que se usaban antes.
+const IMG_PARAMS = 'auto=format&fit=crop&w=640&q=60';
+
+const fallbackImage = `https://images.unsplash.com/photo-1547592166-23ac45744acd?${IMG_PARAMS}`;
+
+const keywordImageMap: Array<{ keyword: RegExp; url: string }> = [
+  {
+    keyword: /sancocho|sopa|caldo|mondongo|tamal|lentejas|frijol/i,
+    url: `https://images.unsplash.com/photo-1608500218803-4f8c2f3f88a9?${IMG_PARAMS}`,
+  },
+  {
+    keyword: /empanada/i,
+    url: `https://images.unsplash.com/photo-1604152135912-04a022e23696?${IMG_PARAMS}`,
+  },
+  {
+    keyword: /aji|ají|salsa|picante/i,
+    url: `https://images.unsplash.com/photo-1511920170033-f8396924c348?${IMG_PARAMS}`,
+  },
+  {
+    keyword: /postre|torta|dulce|flan|natilla|buñuelo|bunuelo/i,
+    url: `https://images.unsplash.com/photo-1488477181946-6428a0291777?${IMG_PARAMS}`,
+  },
+  {
+    keyword: /arroz/i,
+    url: `https://images.unsplash.com/photo-1516684732162-798a0062be99?${IMG_PARAMS}`,
+  },
+  {
+    keyword: /pollo/i,
+    url: `https://images.unsplash.com/photo-1604503468506-a8da13d82791?${IMG_PARAMS}`,
+  },
+  {
+    keyword: /carne|res|cerdo|costilla|chuleta/i,
+    url: `https://images.unsplash.com/photo-1558030006-450675393462?${IMG_PARAMS}`,
+  },
+];
 
 // Carpeta de fotos de producto, servida en vivo por el backend (ver
 // backend/public/productos/README.md) tanto en dev como en produccion. Si el
@@ -41,8 +70,14 @@ function resolveImageUrl(url: string | null): string | null {
   return `${ASSETS_BASE}/${trimmed}`;
 }
 
+function getImageByTitle(title: string) {
+  const match = keywordImageMap.find((item) => item.keyword.test(title));
+  return match ? match.url : fallbackImage;
+}
+
 function resolveProductImage(producto: Producto) {
-  return resolveImageUrl(producto.imagen_url) ?? logoFallback;
+  const local = resolveImageUrl(producto.imagen_url);
+  return local ?? getImageByTitle(producto.nombre);
 }
 
 export function ProductCard({ producto, onAdd }: ProductCardProps) {
@@ -58,32 +93,4 @@ export function ProductCard({ producto, onAdd }: ProductCardProps) {
           decoding="async"
           onError={(event) => {
             const img = event.currentTarget;
-            if (img.dataset.fallbackStage === 'placeholder') return;
-            if (img.dataset.fallbackStage === 'logo') {
-              img.dataset.fallbackStage = 'placeholder';
-              img.src = placeholderFallback;
-              return;
-            }
-            img.dataset.fallbackStage = 'logo';
-            img.src = logoFallback;
-          }}
-        />
-        <span className="category-tag overlay-tag">{producto.categoria}</span>
-        {producto.presentacion ? (
-          <span className="presentation-badge overlay-tag">{producto.presentacion}</span>
-        ) : null}
-      </div>
-      <div className="product-content">
-        <h3>{producto.nombre}</h3>
-        <p>{producto.descripcion || 'Preparacion casera con el sabor especial de Lili.'}</p>
-
-        <div className="card-foot">
-          <strong>{formatCOP(producto.valor)}</strong>
-          <button className="add-round-btn" onClick={() => onAdd(producto)} aria-label={`Agregar ${producto.nombre}`}>
-            <Plus size={18} />
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-}
+            if (img.dataset.fallbackAp
