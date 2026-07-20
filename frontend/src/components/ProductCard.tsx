@@ -50,6 +50,13 @@ const keywordImageMap: Array<{ keyword: RegExp; url: string }> = [
 // apuntar a la URL absoluta del backend (ej. https://api.tu-dominio.com/productos).
 const ASSETS_BASE = (import.meta.env.VITE_ASSETS_URL ?? '/productos').replace(/\/$/, '');
 
+function toSafePath(pathLike: string) {
+  return pathLike
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+}
+
 // Acepta 3 formas en productos.imagen_url:
 //  - URL externa completa: "https://..."
 //  - Ruta ya absoluta: "/productos/archivo.jpg" o "https://..."
@@ -63,11 +70,21 @@ function resolveImageUrl(url: string | null): string | null {
     return trimmed;
   }
 
-  if (trimmed.startsWith('/')) {
-    return trimmed;
-  }
+  // Normaliza rutas provenientes de distintas fuentes/OS, por ejemplo:
+  // "public\\productos\\foto.jpg", "backend/public/productos/foto.jpg",
+  // "/productos/foto.jpg" o simplemente "foto.jpg".
+  const normalized = trimmed
+    .replace(/\\/g, '/')
+    .replace(/^\.?\//, '')
+    .replace(/^backend\//i, '')
+    .replace(/^public\//i, '')
+    .replace(/^productos\//i, '')
+    .replace(/^\/+/, '')
+    .trim();
 
-  return `${ASSETS_BASE}/${trimmed}`;
+  if (!normalized) return null;
+
+  return `${ASSETS_BASE}/${toSafePath(normalized)}`;
 }
 
 function getImageByTitle(title: string) {
